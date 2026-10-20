@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhaka Romance: Our Story</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #030712;
+            color: #f8fafc;
+            touch-action: manipulation;
+            user-select: none;
+            overflow: hidden;
+        }
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            background: #000;
+        }
+        .pixel-border {
+            border: 4px solid #f59e0b;
+            box-shadow: inset 0 0 0 2px #1e293b, 0 0 0 4px #020617, 0 10px 25px rgba(0,0,0,0.8);
+        }
+        .pixel-btn {
+            box-shadow: 0 4px 0 #0f172a, inset 0 2px 0 rgba(255,255,255,0.2);
+            transition: transform 0.05s, box-shadow 0.05s, background-color 0.15s;
+        }
+        .pixel-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #0f172a;
+        }
+        .scanlines {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .glow-title {
+            text-shadow: 0 0 12px rgba(245, 158, 11, 0.8), 0 0 24px rgba(217, 119, 6, 0.6);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center p-2 sm:p-4 select-none bg-slate-950">
+
+    <!-- Game Container -->
+    <div class="relative w-full max-w-4xl aspect-[16/9] bg-black rounded-2xl overflow-hidden border-4 border-amber-600/80 shadow-[0_0_60px_rgba(245,158,11,0.25)] flex flex-col">
+        
+        <!-- CRT Scanline overlay -->
+        <div class="scanlines"></div>
+
+        <!-- Header / Control Bar (RPG Style HUD Header) -->
+        <div class="absolute top-3 left-3 right-3 z-20 flex justify-between items-center pointer-events-none">
+            <div id="stage-badge" class="bg-slate-950/90 text-amber-300 text-[9px] sm:text-xs px-3 py-2 rounded-lg border-2 border-amber-500/70 shadow-lg backdrop-blur-md pointer-events-auto font-bold tracking-wider flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 1: THE CAFETERIA MEETUP
+            </div>
+            <div class="flex gap-2 pointer-events-auto">
+                <button id="btn-audio" class="pixel-btn bg-purple-800 hover:bg-purple-700 text-amber-200 p-2 px-3 rounded-lg text-xs border-2 border-purple-400 font-bold">
+                    🔊 Audio
+                </button>
+                <button id="btn-restart" class="pixel-btn bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 px-3 rounded-lg text-xs border-2 border-slate-500 font-bold">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Element -->
+        <canvas id="gameCanvas" width="800" height="450" class="w-full h-full object-contain block"></canvas>
+
+        <!-- Dialogue Box Overlay (Classic RPG Frame) -->
+        <div id="dialogue-box" class="hidden absolute bottom-14 left-4 right-4 bg-slate-950/95 border-4 border-amber-500 p-4 rounded-xl z-30 shadow-[0_10px_35px_rgba(0,0,0,0.95)] min-h-[110px] backdrop-blur-md">
+            <div class="flex justify-between items-center mb-2 border-b-2 border-amber-500/40 pb-1.5">
+                <span id="dialogue-speaker" class="text-amber-300 text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Boy
+                </span>
+                <span class="text-[9px] sm:text-[10px] text-amber-400/80 animate-pulse">[PRESS SPACE / TAP TO CONTINUE]</span>
+            </div>
+            <p id="dialogue-text" class="text-slate-100 text-xs sm:text-sm leading-relaxed min-h-[42px] font-sans sm:font-mono tracking-wide"></p>
+        </div>
+
+        <!-- On-Screen Touch Controls -->
+        <div id="touch-controls" class="absolute bottom-3 left-3 right-3 z-20 flex justify-between items-center pointer-events-auto">
+            <div class="flex gap-2">
+                <button id="btn-left" class="pixel-btn px-4 py-2.5 bg-slate-900/90 hover:bg-slate-800 active:bg-amber-600 text-amber-300 rounded-lg flex items-center justify-center text-xs font-bold border-2 border-amber-500/50 shadow-lg backdrop-blur-sm">
+                    ◀ LEFT
+                </button>
+                <button id="btn-right" class="pixel-btn px-4 py-2.5 bg-slate-900/90 hover:bg-slate-800 active:bg-amber-600 text-amber-300 rounded-lg flex items-center justify-center text-xs font-bold border-2 border-amber-500/50 shadow-lg backdrop-blur-sm">
+                    RIGHT ▶
+                </button>
+            </div>
+            <div>
+                <button id="btn-action" class="pixel-btn px-5 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-lg text-xs font-bold border-2 border-amber-300 flex items-center justify-center shadow-lg">
+                    TALK / INTERACT 💬
+                </button>
+            </div>
+        </div>
+
+        <!-- Start Overlay Screen -->
+        <div id="overlay-msg" class="absolute inset-0 z-40 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+            <div class="mb-4 text-amber-400 text-4xl sm:text-6xl animate-bounce drop-shadow-[0_0_15px_rgba(245,158,11,0.8)]">⚔️💖</div>
+            <h1 class="text-2xl sm:text-4xl text-amber-400 mb-2 tracking-wider glow-title">DHAKA ROMANCE</h1>
+            <h2 class="text-xs sm:text-sm text-amber-300/80 mb-6 tracking-widest font-mono">OUR STORY - 16-BIT RPG EDITION</h2>
+            <p class="text-xs sm:text-sm text-slate-300 mb-8 max-w-md leading-relaxed font-sans">
+                Experience high-detail 16-bit RPG graphics with rich shadows, character avatars, interior CNG bumpy rides, and atmospheric Dhaka locations!
+            </p>
+            <button id="btn-start" class="pixel-btn bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-xl text-xs sm:text-sm font-bold border-2 border-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.5)]">
+                START QUEST ▶
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Instructions Footnote -->
+    <div class="mt-3 text-[10px] text-slate-400 text-center tracking-wide flex items-center gap-3 justify-center">
+        <span>Controls: <span class="text-amber-400">Arrow Keys / A-D</span></span>
+        <span>•</span>
+        <span>Interact: <span class="text-amber-400">Spacebar / Tap Button</span></span>
+    </div>
+
+    <script>
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.bgmTimer = null;
+                this.bgmIndex = 0;
+                this.melody = [
+                    261.63, 329.63, 392.00, 523.25, 440.00, 349.23, 329.63, 293.66,
+                    261.63, 329.63, 392.00, 440.00, 392.00, 349.23, 329.63, 293.66,
+                    220.00, 261.63, 329.63, 440.00, 392.00, 329.63, 261.63, 293.66,
+                    261.63, 329.63, 392.00, 523.25, 440.00, 392.00, 349.23, 261.63
+                ];
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+                this.startBGM();
+            }
+            startBGM() {
+                if (this.bgmTimer) return;
+                this.bgmTimer = setInterval(() => {
+                    if (this.muted || !this.ctx) return;
+                    try {
+                        const freq = this.melody[this.bgmIndex];
+                        this.bgmIndex = (this.bgmIndex + 1) % this.melody.length;
+                        
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                        
+                        gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.0005, this.ctx.currentTime + 0.38);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start();
+                        osc.stop(this.ctx.currentTime + 0.38);
+
+                        if (this.bgmIndex % 4 === 0) {
+                            const bassOsc = this.ctx.createOscillator();
+                            const bassGain = this.ctx.createGain();
+                            bassOsc.type = 'sine';
+                            bassOsc.frequency.setValueAtTime(freq / 2, this.ctx.currentTime);
+                            
+                            bassGain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+                            bassGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.7);
+                            
+                            bassOsc.connect(bassGain);
+                            bassGain.connect(this.ctx.destination);
+                            bassOsc.start();
+                            bassOsc.stop(this.ctx.currentTime + 0.7);
+                        }
+                    } catch(e){}
+                }, 380);
+            }
+            playBeep(isHigh) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(isHigh ? 680 : 440, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.05);
+                } catch(e){}
+            }
+            playStep() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.04);
+                    gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.04);
+                } catch(e){}
+            }
+            playBubble() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(350 + Math.random()*250, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(900 + Math.random()*200, this.ctx.currentTime + 0.12);
+                    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.12);
+                } catch(e){}
+            }
+            playCngSound() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(80 + Math.random()*30, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.015, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e){}
+            }
+            playBump() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(160 + Math.random()*80, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e){}
+            }
+            playChime() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.09);
+                        gain.gain.setValueAtTime(0.07, this.ctx.currentTime + idx * 0.09);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.09 + 0.5);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(this.ctx.currentTime + idx * 0.09);
+                        osc.stop(this.ctx.currentTime + idx * 0.09 + 0.5);
+                    });
+                } catch(e){}
+            }
+        }
+
+        const sound = new SoundSystem();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const keys = { left: false, right: false };
+
+        let currentStage = 1;
+        let dialogueActive = false;
+        let dialogueQueue = [];
+        let currentDialogueIndex = 0;
+        let dialogueCharIndex = 0;
+        let dialogueTimer = null;
+        let fullDialogueText = "";
+        let displayedText = "";
+
+        let globalTick = 0;
+        let cngTimer = 0;
+        let bubbles = [];
+        let particles = [];
+        let ambientDust = [];
+        let birds = [
+            { x: 80, y: 40, speed: 1.2 },
+            { x: 280, y: 65, speed: 1.6 },
+            { x: 520, y: 35, speed: 1.0 }
+        ];
+
+        for (let i = 0; i < 50; i++) {
+            ambientDust.push({
+                x: Math.random() * 800,
+                y: Math.random() * 450,
+                radius: Math.random() * 2 + 1,
+                speedY: Math.random() * 0.3 - 0.15,
+                speedX: Math.random() * 0.4 + 0.2,
+                alpha: Math.random() * 0.6 + 0.2
+            });
+        }
+
+        const boy = {
+            x: 80,
+            y: 275,
+            width: 38,
+            height: 74,
+            vx: 0,
+            speed: 2.8,
+            direction: 1,
+            isWalking: false,
+            frame: 0,
+            waving: false,
+            sweating: false,
+            affection: 100
+        };
+
+        const girl = {
+            x: 580,
+            y: 275,
+            width: 38,
+            height: 74,
+            direction: -1,
+            waving: false,
+            affection: 100
+        };
+
+        const vendor = {
+            x: 340,
+            y: 275,
+            width: 38,
+            height: 74
+        };
+
+        const cng = {
+            x: -200,
+            y: 280,
+            speed: 3.5
+        };
+
+        let stage3Task = {
+            askedForBubbles: false,
+            boughtBubbles: false,
+            blownBubbles: false
+        };
+
+        let stage5Task = {
+            cngHailed: false,
+            cngArrived: false
+        };
+
+        const STAGE_DIALOGUES = {
+            1: [
+                { speaker: "Boy", text: "Hey! Sorry to keep you waiting in front of TSC DU Cafeteria. You look really stunning in that maroon kameez today." },
+                { speaker: "Girl", text: "Thank you! I was enjoying the warm afternoon breeze anyway. Ready for our adventure?" },
+                { speaker: "Boy", text: "Let's hail a green CNG and head straight over to Rabindra Sarobar in Dhanmondi!" },
+                { speaker: "Girl (In her mind)", text: "(He offered a CNG just to keep me comfortable... That is so sweet!)" },
+                { speaker: "Girl", text: "A CNG sounds wonderful! Let's go!" }
+            ],
+            2: [
+                { speaker: "Girl", text: "Whoa!! This Mirpur Road is full of potholes today!" },
+                { speaker: "Boy", text: "Hold on tight! *bounces uncontrollably* Mama CNG driver is driving like a formula 1 racer!" },
+                { speaker: "Girl", text: "Hahaha, we are bouncing like popcorn in here! But it's so fun!" },
+                { speaker: "Boy", text: "Careful, don't hit your head on the ceiling bar! Almost at Rabindra Sarobar!" }
+            ],
+            '3_girl_asks': [
+                { speaker: "Girl", text: "Look at that street vendor over there! Could you buy me some bubble solution? I want to blow bubbles by the lake!" },
+                { speaker: "Boy", text: "Of course! Stay right here, I'll go get a bottle for us right now!" }
+            ],
+            '3_vendor': [
+                { speaker: "Boy", text: "Hello Uncle! Can I get a bottle of bubble solution please?" },
+                { speaker: "Vendor", text: "Sure thing young man! Here you go. Enjoy blowing bubbles by Rabindra Sarobar lake!" }
+            ],
+            '3_girl': [
+                { speaker: "Girl", text: "Yay, thank you! Look at them float over Dhanmondi Lake in the sunlight!" },
+                { speaker: "Boy", text: "Haha, they look magical! I knew you'd enjoy these simple moments." },
+                { speaker: "Girl", text: "It's perfect. Now... I'm getting a little hungry. How about grab a bite to eat?" }
+            ],
+            4: [
+                { speaker: "Boy", text: "This burger place is so cozy! Sitting side-by-side like this makes watching anime together on the iPad so comfortable." },
+                { speaker: "Girl", text: "I know, right? These juicy burgers are delicious, and sharing the iPad screen with you makes it feel so romantic!" },
+                { speaker: "Boy", text: "Time really flies when I'm with you. Dusk is falling outside already." }
+            ],
+            5: [
+                { speaker: "Girl", text: "The night sky over Dhaka is so clear tonight under these street lamps." },
+                { speaker: "Boy", text: "Wait here safely on the sidewalk while I step up to hail a green CNG for us." }
+            ],
+            '5_hailed': [
+                { speaker: "Boy", text: "Found one! Up to DMC Girls Hostel, Mama!" },
+                { speaker: "Girl", text: "Perfect timing. Let's hop in!" }
+            ],
+            '5_cng_night': [
+                { speaker: "Boy", text: "Whoa! The night potholes are even bigger! *bumps around*" },
+                { speaker: "Girl", text: "Haha, oh my gosh! I'm jumping right off the seat! Grab my hand so we don't fly out!" },
+                { speaker: "Boy", text: "I've got you! Even with all the bumps, this was the best night ever." },
+                { speaker: "Girl", text: "Me too! Here comes DMC Girls Hostel gate!" }
+            ],
+            6: [
+                { speaker: "Girl", text: "Thank you for such a wonderful day out across the city." },
+                { speaker: "Boy", text: "It was my pleasure! Get a good rest tonight. I'll text you as soon as I get home." },
+                { speaker: "Girl", text: "Goodnight! Take care on your way back." }
+            ]
+        };
+
+        function drawPixelRect(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+        }
+
+        // Draw dark outline around RPG sprites
+        function drawRpgOutline(x, y, w, h) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(Math.round(x - 2), Math.round(y - 2), Math.round(w + 4), Math.round(h + 4));
+        }
+
+        // --- RPG HUD Overlay ---
+        function drawRpgHudHeader() {
+            ctx.save();
+            
+            // BOY PORTRAIT BOX
+            drawPixelRect(16, 16, 44, 44, '#0f172a');
+            drawPixelRect(18, 18, 40, 40, '#1e293b');
+            drawPixelRect(20, 20, 36, 36, '#38bdf8');
+            // Mini Boy Face in Portrait
+            drawPixelRect(28, 30, 20, 18, '#fde68a');
+            drawPixelRect(24, 24, 28, 10, '#0f172a'); // Hair
+            drawPixelRect(30, 34, 4, 4, '#0f172a');  // Eyes
+            drawPixelRect(38, 34, 4, 4, '#0f172a');
+            // Boy Frame Border
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(17, 17, 42, 42);
+
+            // BOY HP / STAT BARS
+            drawPixelRect(66, 20, 80, 10, '#020617');
+            drawPixelRect(68, 22, 76, 6, '#dc2626'); // Red HP bar
+            drawPixelRect(68, 22, 76 * (boy.affection / 100), 6, '#ef4444');
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '8px "Press Start 2P"';
+            ctx.fillText("BOY LV.12", 66, 40);
+
+            // GIRL PORTRAIT BOX
+            drawPixelRect(160, 16, 44, 44, '#0f172a');
+            drawPixelRect(162, 18, 40, 40, '#1e293b');
+            drawPixelRect(164, 20, 36, 36, '#9f1239');
+            // Mini Girl Face in Portrait
+            drawPixelRect(172, 30, 20, 18, '#fde68a');
+            drawPixelRect(168, 22, 28, 10, '#0f172a'); // Hair
+            drawPixelRect(174, 34, 4, 4, '#0f172a');   // Eyes
+            drawPixelRect(182, 34, 4, 4, '#0f172a');
+            // Girl Frame Border
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(161, 17, 42, 42);
+
+            // GIRL HP / STAT BARS
+            drawPixelRect(210, 20, 80, 10, '#020617');
+            drawPixelRect(212, 22, 76, 6, '#dc2626');
+            drawPixelRect(212, 22, 76 * (girl.affection / 100), 6, '#ec4899'); // Pink Heart bar
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '8px "Press Start 2P"';
+            ctx.fillText("GIRL LV.12", 210, 40);
+
+            // TOP RIGHT RPG STATS
+            drawPixelRect(590, 16, 194, 42, 'rgba(15, 23, 42, 0.85)');
+            ctx.strokeStyle = '#d97706';
+            ctx.strokeRect(590, 16, 194, 42);
+
+            ctx.fillStyle = '#fde68a';
+            ctx.font = '8px "Press Start 2P"';
+            ctx.fillText("💖 LOVE: 999", 602, 32);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillText("✨ EXP: 250", 602, 48);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText("🪙 500", 720, 32);
+
+            // RPG ACTION QUICK SLOTS AT BOTTOM RIGHT
+            const slots = ['💬', '❤️', '🎈', '🥤'];
+            slots.forEach((s, idx) => {
+                let sx = 630 + idx * 36;
+                let sy = 390;
+                drawPixelRect(sx, sy, 32, 32, '#0f172a');
+                drawPixelRect(sx + 2, sy + 2, 28, 28, '#1e293b');
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(sx, sy, 32, 32);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px "Press Start 2P"';
+                ctx.fillText(s, sx + 8, sy + 22);
+            });
+
+            ctx.restore();
+        }
+
+        function drawHighDetailBoy(x, y, dir, isWalking, frame) {
+            ctx.save();
+            ctx.translate(Math.round(x + 19), Math.round(y));
+            if (dir === -1) ctx.scale(-1, 1);
+
+            const legOffset = isWalking ? Math.sin(frame * 0.35) * 7 : 0;
+
+            // Dark RPG Contact Shadow
+            let shadowGrad = ctx.createRadialGradient(0, 70, 2, 0, 70, 20);
+            shadowGrad.addColorStop(0, 'rgba(2, 6, 23, 0.85)');
+            shadowGrad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+            ctx.fillStyle = shadowGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, 68, 20, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // RPG Outline
+            drawRpgOutline(-14, -10, 28, 80);
+
+            // Boots with metal buckles
+            drawPixelRect(-11 - legOffset, 62, 10, 8, '#0f172a');
+            drawPixelRect(1 + legOffset, 62, 10, 8, '#020617');
+            drawPixelRect(-12 - legOffset, 68, 12, 4, '#475569');
+            drawPixelRect(0 + legOffset, 68, 12, 4, '#334155');
+            drawPixelRect(-10 - legOffset, 64, 4, 2, '#fbbf24'); // Gold buckle
+
+            // Dark Blue Denim Armor Trousers
+            drawPixelRect(-9 - legOffset, 42, 8, 22, '#1e3a8a');
+            drawPixelRect(1 + legOffset, 42, 8, 22, '#1d4ed8');
+            drawPixelRect(-7 - legOffset, 43, 3, 19, '#3b82f6'); // Highlight
+            drawPixelRect(3 + legOffset, 43, 3, 19, '#2563eb');
+
+            // Jacket / RPG Tunic
+            drawPixelRect(-12, 20, 24, 23, '#0369a1'); 
+            drawPixelRect(-10, 20, 20, 23, '#0284c7'); 
+            drawPixelRect(-4, 22, 8, 21, '#bae6fd');  // Inner shirt
+            drawPixelRect(-2, 24, 4, 19, '#ffffff');  
+            drawPixelRect(-12, 41, 24, 3, '#0c4a6e');  // Belt rim
+            drawPixelRect(-3, 40, 6, 5, '#fbbf24');   // Gold belt buckle
+
+            // Arms & Gauntlets
+            if (boy.waving) {
+                drawPixelRect(10, 2, 6, 22, '#0284c7');
+                drawPixelRect(12, -4, 6, 8, '#fcd34d');
+            } else {
+                drawPixelRect(-15, 22 + legOffset * 0.5, 5, 20, '#0369a1');
+                drawPixelRect(10, 22 - legOffset * 0.5, 5, 20, '#0369a1');
+                drawPixelRect(-15, 40 + legOffset * 0.5, 5, 5, '#fcd34d');
+                drawPixelRect(10, 40 - legOffset * 0.5, 5, 5, '#fcd34d');
+            }
+
+            // Head & Neck
+            drawPixelRect(-4, 13, 8, 5, '#fde68a'); 
+            drawPixelRect(-3, 14, 6, 2, '#f59e0b'); 
+
+            // Face
+            drawPixelRect(-9, -2, 18, 17, '#fef08a');
+            drawPixelRect(-8, -1, 16, 15, '#fde68a');
+
+            // RPG Hero Hair
+            drawPixelRect(-11, -8, 22, 10, '#0f172a'); 
+            drawPixelRect(-12, -5, 7, 13, '#0f172a');  
+            drawPixelRect(-10, -6, 18, 4, '#334155');  
+            drawPixelRect(-8, -4, 12, 3, '#64748b');   
+
+            // Glasses / Eyes
+            drawPixelRect(-7, 2, 15, 6, '#020617');   
+            drawPixelRect(-6, 3, 5, 4, '#bae6fd');    
+            drawPixelRect(2, 3, 5, 4, '#bae6fd');     
+            drawPixelRect(-5, 4, 2, 2, '#ffffff');    
+            drawPixelRect(3, 4, 2, 2, '#ffffff');
+
+            drawPixelRect(-2, 11, 5, 2, '#be123c');   // Smile
+
+            if (boy.sweating) {
+                drawPixelRect(8, -1, 3, 6, '#38bdf8');
+                drawPixelRect(9, -2, 2, 2, '#ffffff');
+            }
+
+            ctx.restore();
+        }
+
+        function drawHighDetailGirl(x, y, dir) {
+            ctx.save();
+            ctx.translate(Math.round(x + 19), Math.round(y));
+            if (dir === -1) ctx.scale(-1, 1);
+
+            let shadowGrad = ctx.createRadialGradient(0, 70, 2, 0, 70, 20);
+            shadowGrad.addColorStop(0, 'rgba(2, 6, 23, 0.85)');
+            shadowGrad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+            ctx.fillStyle = shadowGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, 68, 20, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // RPG Outline
+            drawRpgOutline(-14, -10, 28, 80);
+
+            // Heels / Footwear
+            drawPixelRect(-9, 65, 7, 5, '#f59e0b');
+            drawPixelRect(2, 65, 7, 5, '#f59e0b');
+            drawPixelRect(-8, 63, 5, 2, '#fbbf24');
+            drawPixelRect(3, 63, 5, 2, '#fbbf24');
+
+            // Salwar base
+            drawPixelRect(-8, 48, 6, 17, '#4c0519');
+            drawPixelRect(2, 48, 6, 17, '#4c0519');
+
+            // Maroon Kameez with rich RPG Gold embroidery
+            drawPixelRect(-13, 18, 26, 34, '#800020'); 
+            drawPixelRect(-11, 18, 22, 32, '#9f1239'); 
+            drawPixelRect(-14, 34, 28, 16, '#be123c'); 
+
+            // Intricate Zari / Golden embroidery hem design
+            drawPixelRect(-14, 48, 28, 4, '#fbbf24');
+            drawPixelRect(-12, 46, 24, 1, '#fef08a');
+            for (let i = -12; i < 14; i += 4) {
+                drawPixelRect(i, 44, 2, 2, '#f59e0b');
+            }
+
+            // Ornate neck embroidery
+            drawPixelRect(-4, 20, 8, 14, '#f59e0b');
+            drawPixelRect(-2, 22, 4, 10, '#fef08a');
+
+            // Silk Dupatta drape over shoulders
+            drawPixelRect(-15, 20, 7, 30, '#be123c');
+            drawPixelRect(8, 20, 7, 30, '#be123c');
+            drawPixelRect(-15, 48, 7, 2, '#facc15'); 
+            drawPixelRect(8, 48, 7, 2, '#facc15');
+
+            // Arms & Bangles
+            if (girl.waving) {
+                drawPixelRect(10, 6, 5, 20, '#9f1239');
+                drawPixelRect(12, 1, 5, 6, '#fde68a');
+            } else {
+                drawPixelRect(-15, 22, 4, 18, '#9f1239');
+                drawPixelRect(11, 22, 4, 18, '#9f1239');
+                drawPixelRect(-15, 38, 4, 2, '#facc15'); 
+                drawPixelRect(11, 38, 4, 2, '#facc15');
+                drawPixelRect(-15, 40, 4, 4, '#fde68a'); 
+                drawPixelRect(11, 40, 4, 4, '#fde68a');
+            }
+
+            // Head & Neck
+            drawPixelRect(-4, 13, 8, 5, '#fde68a');
+            drawPixelRect(-3, 14, 6, 2, '#f59e0b');
+
+            // Face
+            drawPixelRect(-9, -2, 18, 17, '#fef08a');
+            drawPixelRect(-8, -1, 16, 15, '#fde68a');
+
+            // Long flowing black hair with RPG shine
+            drawPixelRect(-12, -9, 24, 12, '#090d16');
+            drawPixelRect(-14, -3, 6, 30, '#090d16');
+            drawPixelRect(8, -3, 6, 30, '#090d16');
+            drawPixelRect(-9, -7, 16, 3, '#475569'); 
+
+            // Gold earrings
+            drawPixelRect(-11, 11, 3, 5, '#fbbf24');
+            drawPixelRect(8, 11, 3, 5, '#fbbf24');
+
+            // Eyes & Red Bindi
+            drawPixelRect(-1, 2, 2, 2, '#be123c');   
+            drawPixelRect(-5, 5, 4, 4, '#0f172a');
+            drawPixelRect(1, 5, 4, 4, '#0f172a');
+            drawPixelRect(-4, 4, 2, 2, '#ffffff');    
+            drawPixelRect(2, 4, 2, 2, '#ffffff');
+
+            drawPixelRect(-6, 10, 4, 2, 'rgba(244, 63, 94, 0.6)'); 
+            drawPixelRect(2, 10, 4, 2, 'rgba(244, 63, 94, 0.6)');
+            drawPixelRect(-2, 12, 5, 2, '#be123c');   
+
+            ctx.restore();
+        }
+
+        function drawHighDetailVendor(x, y) {
+            ctx.save();
+            ctx.translate(Math.round(x), Math.round(y));
+            drawRpgOutline(0, 0, 36, 72);
+            drawPixelRect(2, 68, 30, 5, 'rgba(0,0,0,0.6)');
+            drawPixelRect(6, 22, 22, 34, '#047857');
+            drawPixelRect(8, 50, 18, 18, '#f8fafc'); 
+            drawPixelRect(8, 4, 18, 18, '#fde68a');
+            drawPixelRect(8, 0, 18, 6, '#ffffff'); 
+            drawPixelRect(8, 16, 18, 8, '#cbd5e1'); 
+            drawPixelRect(-6, 16, 12, 48, '#d97706'); 
+            drawPixelRect(-14, 8, 26, 12, '#38bdf8'); 
+            ctx.restore();
+        }
+
+        function drawHighDetailCNG(x, y) {
+            ctx.save();
+            ctx.translate(Math.round(x), Math.round(y));
+
+            // Shadow
+            drawPixelRect(5, 62, 100, 10, 'rgba(0,0,0,0.7)');
+
+            // Main CNG Body with dark outline
+            drawRpgOutline(10, 15, 90, 40);
+
+            drawPixelRect(10, 15, 90, 40, '#15803d');
+            drawPixelRect(12, 17, 86, 36, '#16a34a');
+            drawPixelRect(14, 19, 82, 32, '#22c55e');
+
+            // Canvas Hood Top
+            drawPixelRect(18, 4, 74, 13, '#b45309');
+            drawPixelRect(22, 6, 66, 9, '#f59e0b');
+
+            // Wire Mesh Grill
+            drawPixelRect(35, 22, 36, 22, '#022c22');
+            for (let i = 37; i < 70; i += 4) {
+                drawPixelRect(i, 22, 2, 22, '#4ade80');
+            }
+
+            // Windshield
+            drawPixelRect(75, 12, 22, 20, '#0284c7');
+            drawPixelRect(77, 14, 18, 16, '#38bdf8');
+            drawPixelRect(78, 15, 7, 7, '#e0f2fe'); 
+
+            // Taxi Stripe
+            drawPixelRect(10, 45, 90, 7, '#facc15');
+            for (let i = 10; i < 100; i += 12) {
+                drawPixelRect(i, 45, 6, 7, '#0f172a');
+            }
+
+            // 3 Wheels
+            drawPixelRect(20, 48, 20, 20, '#0f172a');
+            drawPixelRect(24, 52, 12, 12, '#64748b');
+            drawPixelRect(28, 56, 4, 4, '#cbd5e1');
+
+            drawPixelRect(76, 48, 20, 20, '#0f172a');
+            drawPixelRect(80, 52, 12, 12, '#64748b');
+            drawPixelRect(84, 56, 4, 4, '#cbd5e1');
+
+            // Dynamic Headlight Beam
+            drawPixelRect(98, 30, 6, 12, '#fef08a');
+            let lightGlow = ctx.createRadialGradient(104, 36, 2, 160, 36, 70);
+            lightGlow.addColorStop(0, 'rgba(254, 240, 138, 0.8)');
+            lightGlow.addColorStop(1, 'rgba(254, 240, 138, 0)');
+            ctx.fillStyle = lightGlow;
+            ctx.beginPath();
+            ctx.arc(104, 36, 70, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // --- INTERIOR CNG SCENE WITH BUMPY VIBRATIONS ---
+        function drawCngInteriorScene(isNight) {
+            ctx.save();
+
+            // Pothole bump calculation
+            let bumpFrequency = 0.25;
+            let bumpIntensity = Math.abs(Math.sin(globalTick * bumpFrequency)) > 0.65 ? Math.sin(globalTick * 0.9) * 16 : Math.sin(globalTick * 0.15) * 3;
+            
+            if (Math.abs(bumpIntensity) > 10 && globalTick % 6 === 0) {
+                sound.playBump();
+            }
+
+            // Background scrolling streets through CNG mesh
+            let roadScroller = (globalTick * 12) % 800;
+
+            if (isNight) {
+                let darkSky = ctx.createLinearGradient(0, 0, 0, 300);
+                darkSky.addColorStop(0, '#020617');
+                darkSky.addColorStop(1, '#1e1b4b');
+                ctx.fillStyle = darkSky;
+                ctx.fillRect(0, 0, 800, 300);
+
+                for (let i = -1; i < 6; i++) {
+                    let lx = i * 160 - roadScroller % 160;
+                    drawPixelRect(lx, 100, 18, 140, '#1e293b');
+                    drawPixelRect(lx - 12, 95, 42, 12, '#fef08a');
+                }
+            } else {
+                let daySky = ctx.createLinearGradient(0, 0, 0, 300);
+                daySky.addColorStop(0, '#0284c7');
+                daySky.addColorStop(1, '#38bdf8');
+                ctx.fillStyle = daySky;
+                ctx.fillRect(0, 0, 800, 300);
+
+                for (let i = -1; i < 6; i++) {
+                    let tx = i * 180 - roadScroller % 180;
+                    drawPixelRect(tx, 140, 100, 110, '#15803d');
+                    drawPixelRect(tx + 25, 200, 50, 50, '#334155');
+                }
+            }
+
+            // Road Below
+            drawPixelRect(0, 240, 800, 110, '#1e293b');
+            for (let i = -1; i < 10; i++) {
+                let rx = i * 110 - roadScroller % 110;
+                drawPixelRect(rx, 290, 60, 8, '#facc15');
+            }
+
+            // Interior CNG Cabin Structure
+            let cabinY = Math.round(bumpIntensity);
+
+            // CNG Green Outer Frame
+            drawPixelRect(0, 0 + cabinY, 800, 50, '#15803d');
+            drawPixelRect(0, 330 + cabinY, 800, 120, '#16a34a');
+            drawPixelRect(0, 0 + cabinY, 70, 450, '#15803d');
+            drawPixelRect(730, 0 + cabinY, 70, 450, '#15803d');
+
+            // Leather Back Seat Cushion
+            drawPixelRect(110, 220 + cabinY, 580, 120, '#022c22');
+            drawPixelRect(120, 230 + cabinY, 560, 100, '#064e3b');
+            drawPixelRect(130, 240 + cabinY, 540, 12, '#047857');
+
+            // Wire Mesh Canvas Grill Bars
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.lineWidth = 6;
+            for (let mx = 80; mx < 720; mx += 40) {
+                ctx.beginPath();
+                ctx.moveTo(mx, 50 + cabinY);
+                ctx.lineTo(mx, 230 + cabinY);
+                ctx.stroke();
+            }
+
+            // Driver Front Partition Wall & Bar Handle
+            drawPixelRect(100, 60 + cabinY, 12, 180, '#0f172a');
+            drawPixelRect(680, 60 + cabinY, 12, 180, '#0f172a');
+            drawPixelRect(100, 50 + cabinY, 600, 16, '#d97706'); // Safety Metal Pipe
+
+            // SEATED & JUMPING PASSENGERS INSIDE CNG
+            let boyJumpY = 190 + cabinY - Math.max(0, bumpIntensity * 1.4);
+            let girlJumpY = 190 + cabinY - Math.max(0, -bumpIntensity * 1.4);
+
+            // BOY SEATED (LEFT SIDE)
+            drawHighDetailBoy(230, boyJumpY, 1, false, 0);
+
+            // GIRL SEATED (RIGHT SIDE)
+            drawHighDetailGirl(490, girlJumpY, -1);
+
+            // "BUMP!" Visual Motion Lines
+            if (Math.abs(bumpIntensity) > 8) {
+                ctx.fillStyle = '#fef08a';
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("💥 BUMP!", 340, 120 + cabinY);
+
+                // Sweat/Shock droplets
+                drawPixelRect(280, boyJumpY - 15, 4, 8, '#38bdf8');
+                drawPixelRect(510, girlJumpY - 15, 4, 8, '#38bdf8');
+            }
+
+            // Driver Mirror in front center
+            drawPixelRect(360, 20 + cabinY, 80, 30, '#0f172a');
+            drawPixelRect(364, 24 + cabinY, 72, 22, '#38bdf8');
+            drawPixelRect(385, 30 + cabinY, 16, 12, '#020617'); // Mini driver eyes
+
+            ctx.restore();
+        }
+
+        function drawEnvironment() {
+            if (currentStage === 5 || currentStage === 6 || currentStage === 5.5) {
+                let grad = ctx.createLinearGradient(0, 0, 0, 450);
+                grad.addColorStop(0, '#020617');
+                grad.addColorStop(0.4, '#1e1b4b');
+                grad.addColorStop(1, '#311042');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 450);
+
+                for (let i = 0; i < 60; i++) {
+                    let sx = (i * 43) % 800;
+                    let sy = (i * 23) % 210;
+                    let size = (i % 4 === 0) ? 3 : 2;
+                    ctx.fillStyle = (i % 2 === 0) ? '#fef08a' : '#38bdf8';
+                    if ((globalTick + i * 8) % 60 < 45) {
+                        ctx.fillRect(sx, sy, size, size);
+                    }
+                }
+            } else if (currentStage === 4) {
+                let grad = ctx.createLinearGradient(0, 0, 0, 450);
+                grad.addColorStop(0, '#2d1202');
+                grad.addColorStop(1, '#542307');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 450);
+            } else if (currentStage !== 2 && currentStage !== 5.5) {
+                let grad = ctx.createLinearGradient(0, 0, 0, 450);
+                grad.addColorStop(0, '#0369a1');
+                grad.addColorStop(0.5, '#0284c7');
+                grad.addColorStop(1, '#38bdf8');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 450);
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(100 + i * 140, 0);
+                    ctx.lineTo(200 + i * 180, 450);
+                    ctx.lineTo(120 + i * 180, 450);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            if (currentStage !== 4 && currentStage !== 2 && currentStage !== 5.5) {
+                let cloudOffset = (globalTick * 0.3) % 800;
+                [
+                    { x: 20, y: 30, w: 120 }, { x: 280, y: 50, w: 150 }, { x: 560, y: 20, w: 130 }
+                ].forEach(c => {
+                    let cx = (c.x + cloudOffset) % 920 - 120;
+                    let cloudColor = (currentStage >= 5) ? 'rgba(255, 255, 255, 0.25)' : '#ffffff';
+                    drawPixelRect(cx, c.y, c.w, 24, cloudColor);
+                    drawPixelRect(cx + 14, c.y - 12, c.w - 28, 16, cloudColor);
+                    drawPixelRect(cx + 30, c.y - 20, c.w - 60, 10, cloudColor);
+                });
+
+                birds.forEach(b => {
+                    b.x += b.speed;
+                    if (b.x > 820) b.x = -20;
+                    let wing = Math.sin(globalTick * 0.2 + b.x) > 0 ? -4 : 4;
+                    ctx.fillStyle = (currentStage >= 5) ? '#cbd5e1' : '#0f172a';
+                    ctx.fillRect(Math.round(b.x), Math.round(b.y), 8, 2);
+                    ctx.fillRect(Math.round(b.x - 5), Math.round(b.y + wing), 5, 2);
+                    ctx.fillRect(Math.round(b.x + 8), Math.round(b.y + wing), 5, 2);
+                });
+            }
+
+            // STAGE SPECIFIC SCENERY
+            if (currentStage === 1) {
+                // TSC DU Cafeteria & Red Brick Heritage Building
+                drawPixelRect(0, 180, 800, 160, '#1e293b');
+                drawPixelRect(340, 100, 400, 240, '#0f172a');
+
+                for (let r = 100; r < 340; r += 16) {
+                    let off = (r % 32 === 0) ? 0 : 16;
+                    for (let c = 340 + off; c < 740; c += 32) {
+                        drawPixelRect(c, r, 28, 12, '#7f1d1d');
+                        drawPixelRect(c + 2, r + 2, 24, 8, '#991b1b');
+                    }
+                }
+
+                // TSC Banner Board
+                drawPixelRect(360, 120, 360, 45, '#991b1b');
+                drawPixelRect(360, 165, 360, 5, '#facc15');
+                ctx.fillStyle = '#fef08a';
+                ctx.font = '11px "Press Start 2P"';
+                ctx.fillText("TSC DU CAFETERIA", 390, 150);
+
+                // Arched Windows
+                drawPixelRect(390, 190, 110, 110, '#0284c7');
+                drawPixelRect(395, 195, 100, 100, '#38bdf8');
+                drawPixelRect(400, 200, 30, 90, '#bae6fd');
+
+                drawPixelRect(540, 190, 140, 150, '#1e293b');
+
+                // Pavement
+                drawPixelRect(0, 340, 800, 20, '#475569');
+                drawPixelRect(0, 360, 800, 90, '#0f172a');
+
+                for (let x = 0; x < 800; x += 32) {
+                    drawPixelRect(x, 340, 2, 20, '#334155');
+                }
+
+                // Krishnachura Trees
+                let sway = Math.sin(globalTick * 0.05) * 4;
+                drawPixelRect(50 + sway, 270, 85, 70, '#b91c1c');
+                drawPixelRect(60 + sway, 250, 65, 30, '#dc2626');
+                drawPixelRect(200 - sway, 280, 70, 60, '#991b1b');
+
+            } else if (currentStage === 3) {
+                // Rabindra Sarobar Lake Side Stage
+                drawPixelRect(0, 200, 800, 140, '#0284c7');
+
+                for (let i = 0; i < 28; i++) {
+                    let rx = (i * 45 + globalTick * 1.8) % 800;
+                    let ry = 210 + (i * 7) % 110;
+                    drawPixelRect(rx, ry, 26, 3, '#7dd3fc');
+                }
+
+                drawPixelRect(0, 325, 800, 15, '#15803d');
+                drawPixelRect(0, 340, 800, 110, '#57534e');
+                for (let x = 0; x < 800; x += 40) {
+                    drawPixelRect(x, 340, 2, 110, '#44403c');
+                }
+
+                let sway = Math.sin(globalTick * 0.05) * 5;
+                drawPixelRect(40, 180, 30, 160, '#27272a');
+                drawPixelRect(0 + sway, 80, 130, 120, '#15803d');
+                drawPixelRect(15 + sway, 65, 100, 30, '#22c55e');
+
+                drawPixelRect(680, 180, 30, 160, '#27272a');
+                drawPixelRect(630 - sway, 80, 130, 120, '#16a34a');
+
+                const flowerColors = ['#f43f5e', '#ec4899', '#a855f7', '#f59e0b', '#3b82f6', '#ffffff'];
+                for (let fx = 10; fx < 790; fx += 28) {
+                    let color = flowerColors[Math.floor(fx / 28) % flowerColors.length];
+                    let fy = 328 + Math.sin(fx * 0.8) * 3;
+                    
+                    drawPixelRect(fx + 3, fy + 4, 2, 8, '#15803d');
+                    drawPixelRect(fx + 1, fy + 7, 2, 2, '#22c55e');
+                    drawPixelRect(fx + 5, fy + 6, 2, 2, '#22c55e');
+
+                    drawPixelRect(fx + 2, fy, 4, 6, color);
+                    drawPixelRect(fx, fy + 2, 8, 2, color);
+                    drawPixelRect(fx + 3, fy + 2, 2, 2, '#fef08a');
+                }
+
+            } else if (currentStage === 4) {
+                // Dhanmondi Burger Cafe
+                for (let r = 0; r < 340; r += 24) {
+                    let offset = (r % 48 === 0) ? 0 : 30;
+                    for (let c = offset; c < 800; c += 60) {
+                        drawPixelRect(c, r, 56, 20, '#451a03');
+                        drawPixelRect(c + 2, r + 2, 52, 16, '#78350f');
+                    }
+                }
+                drawPixelRect(0, 340, 800, 110, '#27272a');
+
+                [180, 400, 620].forEach(lx => {
+                    drawPixelRect(lx, 0, 3, 50, '#0f172a');
+                    drawPixelRect(lx - 18, 50, 36, 25, '#b45309');
+                    drawPixelRect(lx - 12, 55, 24, 20, '#fef08a');
+
+                    let g = ctx.createRadialGradient(lx, 75, 5, lx, 250, 180);
+                    g.addColorStop(0, 'rgba(254, 240, 138, 0.35)');
+                    g.addColorStop(1, 'rgba(254, 240, 138, 0)');
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(lx, 150, 140, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Wooden Cafe Table
+                drawPixelRect(200, 295, 400, 45, '#78350f');
+                drawPixelRect(220, 340, 26, 100, '#451a03');
+                drawPixelRect(550, 340, 26, 100, '#451a03');
+
+                // iPad Screen playing anime scene
+                drawPixelRect(350, 245, 100, 55, '#1e293b');
+                drawPixelRect(355, 248, 90, 49, '#020617');
+                drawPixelRect(358, 250, 84, 45, '#0284c7');
+                drawPixelRect(360, 252, 35, 40, '#f43f5e'); 
+                drawPixelRect(395, 255, 38, 35, '#fde68a');
+
+                // Burgers & Drinks
+                [250, 490].forEach(bx => {
+                    drawPixelRect(bx, 280, 50, 6, '#f8fafc');
+                    drawPixelRect(bx + 5, 274, 40, 6, '#d97706'); 
+                    drawPixelRect(bx + 3, 270, 44, 4, '#451a03'); 
+                    drawPixelRect(bx + 1, 268, 48, 3, '#facc15'); 
+                    drawPixelRect(bx + 4, 264, 42, 4, '#22c55e'); 
+                    drawPixelRect(bx + 6, 261, 38, 3, '#ef4444'); 
+                    drawPixelRect(bx + 4, 253, 42, 8, '#eab308'); 
+                    drawPixelRect(bx + 12, 255, 2, 2, '#ffffff'); 
+                    drawPixelRect(bx + 24, 256, 2, 2, '#ffffff');
+                });
+
+            } else if (currentStage === 5) {
+                // Nighttime Street lamps
+                drawPixelRect(0, 340, 800, 20, '#334155');
+                drawPixelRect(0, 360, 800, 90, '#020617');
+
+                [150, 650].forEach(lx => {
+                    drawPixelRect(lx, 120, 12, 220, '#1e293b');
+                    drawPixelRect(lx - 14, 115, 40, 12, '#334155');
+                    drawPixelRect(lx - 10, 127, 32, 10, '#fef08a');
+
+                    ctx.save();
+                    let coneG = ctx.createLinearGradient(lx + 6, 137, lx + 6, 360);
+                    coneG.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+                    coneG.addColorStop(1, 'rgba(254, 240, 138, 0)');
+                    ctx.fillStyle = coneG;
+                    ctx.beginPath();
+                    ctx.moveTo(lx + 6, 137);
+                    ctx.lineTo(lx - 130, 360);
+                    ctx.lineTo(lx + 140, 360);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+            } else if (currentStage === 6) {
+                // DMC Girls Hostel Entrance Gate
+                drawPixelRect(0, 170, 800, 170, '#4c0519');
+                for (let r = 170; r < 340; r += 20) {
+                    let offset = (r % 40 === 0) ? 0 : 20;
+                    for (let c = offset; c < 800; c += 40) {
+                        drawPixelRect(c, r, 36, 16, '#800020');
+                    }
+                }
+
+                drawPixelRect(460, 120, 290, 220, '#0f172a');
+                drawPixelRect(480, 140, 250, 38, '#facc15');
+
+                ctx.fillStyle = '#800020';
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("DMC GIRLS HOSTEL", 500, 164);
+
+                for (let gx = 480; gx < 730; gx += 20) {
+                    drawPixelRect(gx, 178, 4, 162, '#334155');
+                }
+
+                drawPixelRect(0, 340, 800, 110, '#0f172a');
+            }
+        }
+
+        function updateAndDrawParticles() {
+            if (currentStage === 3) {
+                bubbles.forEach((b, idx) => {
+                    b.x += Math.sin(globalTick * 0.05 + b.seed) * 0.9;
+                    b.y -= b.speed;
+                    b.alpha -= 0.003;
+
+                    ctx.save();
+                    ctx.strokeStyle = `rgba(186, 230, 253, ${Math.max(0, b.alpha)})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, b.alpha)})`;
+                    ctx.fillRect(b.x - b.radius * 0.4, b.y - b.radius * 0.4, 3, 3);
+                    ctx.restore();
+
+                    if (b.y < 80 || b.alpha <= 0) bubbles.splice(idx, 1);
+                });
+            }
+
+            particles.forEach((p, idx) => {
+                p.y -= p.speed;
+                p.alpha -= 0.008;
+
+                ctx.save();
+                let col = `rgba(244, 63, 94, ${Math.max(0, p.alpha)})`;
+                drawPixelRect(p.x - 4, p.y - 4, 4, 4, col);
+                drawPixelRect(p.x, p.y - 4, 4, 4, col);
+                drawPixelRect(p.x - 6, p.y - 2, 12, 4, col);
+                drawPixelRect(p.x - 4, p.y + 2, 8, 4, col);
+                drawPixelRect(p.x - 2, p.y + 6, 4, 4, col);
+                ctx.restore();
+
+                if (p.alpha <= 0) particles.splice(idx, 1);
+            });
+
+            ambientDust.forEach(d => {
+                d.x += d.speedX;
+                d.y += d.speedY;
+                if (d.x > 800) d.x = 0;
+                if (d.y > 450 || d.y < 0) d.y = Math.random() * 450;
+
+                ctx.fillStyle = (currentStage >= 5) ? `rgba(254, 240, 138, ${d.alpha * 0.5})` : `rgba(255, 255, 255, ${d.alpha * 0.4})`;
+                ctx.fillRect(Math.round(d.x), Math.round(d.y), Math.round(d.radius), Math.round(d.radius));
+            });
+        }
+
+        function spawnHeart(x, y) {
+            particles.push({
+                x: x,
+                y: y,
+                speed: 1.2 + Math.random() * 1.5,
+                alpha: 1.0
+            });
+        }
+
+        function spawnBubble(x, y) {
+            bubbles.push({
+                x: x,
+                y: y,
+                radius: 6 + Math.random() * 8,
+                speed: 0.9 + Math.random() * 1.2,
+                seed: Math.random() * 10,
+                alpha: 0.95
+            });
+            sound.playBubble();
+        }
+
+        function triggerDialogue(dialogueArray) {
+            dialogueQueue = dialogueArray;
+            currentDialogueIndex = 0;
+            dialogueActive = true;
+            document.getElementById('dialogue-box').classList.remove('hidden');
+            showDialogueLine();
+        }
+
+        function showDialogueLine() {
+            if (currentDialogueIndex >= dialogueQueue.length) {
+                dialogueActive = false;
+                document.getElementById('dialogue-box').classList.add('hidden');
+                onDialogueFinished();
+                return;
+            }
+
+            const line = dialogueQueue[currentDialogueIndex];
+            document.getElementById('dialogue-speaker').innerText = line.speaker;
+            
+            fullDialogueText = line.text;
+            displayedText = "";
+            dialogueCharIndex = 0;
+            
+            if (dialogueTimer) clearInterval(dialogueTimer);
+
+            dialogueTimer = setInterval(() => {
+                if (dialogueCharIndex < fullDialogueText.length) {
+                    displayedText += fullDialogueText[dialogueCharIndex];
+                    document.getElementById('dialogue-text').innerText = displayedText;
+                    
+                    if (fullDialogueText[dialogueCharIndex] !== ' ' && dialogueCharIndex % 2 === 0) {
+                        sound.playBeep(line.speaker.includes("Girl"));
+                    }
+                    dialogueCharIndex++;
+                } else {
+                    clearInterval(dialogueTimer);
+                }
+            }, 26);
+        }
+
+        function advanceDialogue() {
+            if (!dialogueActive) return;
+
+            if (dialogueCharIndex < fullDialogueText.length) {
+                clearInterval(dialogueTimer);
+                displayedText = fullDialogueText;
+                document.getElementById('dialogue-text').innerText = fullDialogueText;
+                dialogueCharIndex = fullDialogueText.length;
+            } else {
+                currentDialogueIndex++;
+                showDialogueLine();
+            }
+        }
+
+        function onDialogueFinished() {
+            if (currentStage === 1) {
+                setStage(2);
+            } else if (currentStage === 2) {
+                setStage(3);
+            } else if (currentStage === 3) {
+                if (stage3Task.boughtBubbles && stage3Task.blownBubbles) {
+                    setStage(4);
+                }
+            } else if (currentStage === 4) {
+                setStage(5);
+            } else if (currentStage === 5) {
+                if (stage5Task.cngHailed) {
+                    setStage(5.5);
+                }
+            } else if (currentStage === 5.5) {
+                setStage(6);
+            } else if (currentStage === 6) {
+                document.getElementById('overlay-msg').innerHTML = `
+                    <div class="mb-4 text-rose-500 text-5xl sm:text-7xl animate-bounce">💖</div>
+                    <h1 class="text-2xl sm:text-4xl text-amber-400 mb-3 tracking-wider glow-title">QUEST COMPLETE! ❤️</h1>
+                    <p class="text-xs sm:text-sm text-slate-200 mb-8 leading-relaxed max-w-md">
+                        You have completed the romantic adventure through Dhaka!
+                    </p>
+                    <button id="btn-restart-final" onclick="resetGame()" class="pixel-btn bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-xl text-xs sm:text-sm font-bold border-2 border-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                        PLAY AGAIN 🔄
+                    </button>
+                `;
+                document.getElementById('overlay-msg').classList.remove('hidden');
+                sound.playChime();
+            }
+        }
+
+        function setStage(stageNum) {
+            currentStage = stageNum;
+            const badge = document.getElementById('stage-badge');
+
+            boy.x = 60;
+            boy.sweating = false;
+            boy.waving = false;
+
+            if (stageNum === 1) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 1: THE CAFETERIA MEETUP`;
+                girl.x = 560;
+                boy.x = 80;
+            } else if (stageNum === 2) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 2: BUMPY CNG RIDE TO RABINDRA SAROBAR`;
+                cngTimer = 0;
+                setTimeout(() => triggerDialogue(STAGE_DIALOGUES[2]), 400);
+            } else if (stageNum === 3) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 3: BUBBLES AT RABINDRA SAROBAR`;
+                girl.x = 580;
+                boy.x = 80;
+                vendor.x = 340;
+                stage3Task.askedForBubbles = false;
+                stage3Task.boughtBubbles = false;
+                stage3Task.blownBubbles = false;
+            } else if (stageNum === 4) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 4: BURGERS & ANIME MOVIE`;
+                boy.x = 280;
+                girl.x = 450;
+                setTimeout(() => triggerDialogue(STAGE_DIALOGUES[4]), 600);
+            } else if (stageNum === 5) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 5: HAILING CNG AT NIGHT`;
+                girl.x = 200;
+                boy.x = 100;
+                cng.x = -200;
+                stage5Task.cngHailed = false;
+                stage5Task.cngArrived = false;
+                setTimeout(() => triggerDialogue(STAGE_DIALOGUES[5]), 500);
+            } else if (stageNum === 5.5) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 5.5: NIGHTTIME BUMPY CNG RIDE`;
+                cngTimer = 0;
+                setTimeout(() => triggerDialogue(STAGE_DIALOGUES['5_cng_night']), 400);
+            } else if (stageNum === 6) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> CHAPTER 6: DMC GIRLS HOSTEL DROPOFF`;
+                girl.x = 520;
+                boy.x = 410;
+                setTimeout(() => triggerDialogue(STAGE_DIALOGUES[6]), 500);
+            }
+        }
+
+        function update() {
+            globalTick++;
+
+            if (!dialogueActive && (currentStage === 1 || currentStage === 3 || currentStage === 5)) {
+                boy.isWalking = false;
+                boy.vx = 0;
+
+                if (keys.left) {
+                    boy.vx = -boy.speed;
+                    boy.direction = -1;
+                    boy.isWalking = true;
+                } else if (keys.right) {
+                    boy.vx = boy.speed;
+                    boy.direction = 1;
+                    boy.isWalking = true;
+                }
+
+                boy.x += boy.vx;
+
+                if (boy.isWalking && globalTick % 16 === 0) {
+                    sound.playStep();
+                    boy.frame++;
+                }
+
+                boy.x = Math.max(20, Math.min(740, boy.x));
+
+                if (currentStage === 1) {
+                    if (Math.abs(boy.x - girl.x) < 65) {
+                        boy.waving = true;
+                        girl.waving = true;
+                        spawnHeart(girl.x + 18, girl.y);
+                        triggerDialogue(STAGE_DIALOGUES[1]);
+                    }
+                } else if (currentStage === 3) {
+                    if (!stage3Task.askedForBubbles && Math.abs(boy.x - girl.x) < 70) {
+                        stage3Task.askedForBubbles = true;
+                        triggerDialogue(STAGE_DIALOGUES["3_girl_asks"]);
+                    } else if (stage3Task.askedForBubbles && !stage3Task.boughtBubbles && Math.abs(boy.x - vendor.x) < 55) {
+                        stage3Task.boughtBubbles = true;
+                        triggerDialogue(STAGE_DIALOGUES["3_vendor"]);
+                    } else if (stage3Task.boughtBubbles && !stage3Task.blownBubbles && Math.abs(boy.x - girl.x) < 75) {
+                        stage3Task.blownBubbles = true;
+                        for (let i = 0; i < 18; i++) {
+                            setTimeout(() => spawnBubble(boy.x + 30, boy.y + 20), i * 110);
+                        }
+                        triggerDialogue(STAGE_DIALOGUES["3_girl"]);
+                    }
+                } else if (currentStage === 5) {
+                    if (!stage5Task.cngHailed && boy.x > 510) {
+                        stage5Task.cngHailed = true;
+                        boy.sweating = true;
+                    }
+                }
+            }
+
+            if (currentStage === 2 || currentStage === 5.5) {
+                cngTimer++;
+                if (globalTick % 8 === 0) sound.playCngSound();
+                if (globalTick % 20 === 0) spawnHeart(400 + (Math.random()*100 - 50), 200);
+            }
+
+            if (currentStage === 5 && stage5Task.cngHailed && !stage5Task.cngArrived) {
+                cng.x += cng.speed;
+                if (globalTick % 8 === 0) sound.playCngSound();
+                if (cng.x >= 450) {
+                    stage5Task.cngArrived = true;
+                    triggerDialogue(STAGE_DIALOGUES["5_hailed"]);
+                }
+            }
+
+            if ((currentStage === 4 || currentStage === 6) && globalTick % 40 === 0) {
+                spawnHeart(girl.x + 18 + Math.random() * 20 - 10, girl.y);
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawEnvironment();
+
+            if (currentStage === 1) {
+                drawHighDetailGirl(girl.x, girl.y, girl.direction);
+                drawHighDetailBoy(boy.x, boy.y, boy.direction, boy.isWalking, boy.frame);
+            } else if (currentStage === 2) {
+                drawCngInteriorScene(false);
+            } else if (currentStage === 3) {
+                drawHighDetailVendor(vendor.x, vendor.y);
+                drawHighDetailGirl(girl.x, girl.y, girl.direction);
+                drawHighDetailBoy(boy.x, boy.y, boy.direction, boy.isWalking, boy.frame);
+            } else if (currentStage === 4) {
+                drawHighDetailBoy(boy.x, 270, 1, false, 0);
+                drawHighDetailGirl(girl.x, 270, -1);
+            } else if (currentStage === 5) {
+                drawHighDetailGirl(girl.x, girl.y, girl.direction);
+                drawHighDetailBoy(boy.x, boy.y, boy.direction, boy.isWalking, boy.frame);
+                if (cng.x > -190) drawHighDetailCNG(cng.x, cng.y);
+            } else if (currentStage === 5.5) {
+                drawCngInteriorScene(true);
+            } else if (currentStage === 6) {
+                drawHighDetailGirl(girl.x, girl.y, girl.direction);
+                drawHighDetailBoy(boy.x, boy.y, boy.direction, boy.isWalking, boy.frame);
+            }
+
+            updateAndDrawParticles();
+            drawRpgHudHeader();
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            document.getElementById('overlay-msg').classList.add('hidden');
+            sound.init();
+            setStage(1);
+        }
+
+        function resetGame() {
+            document.getElementById('overlay-msg').classList.remove('hidden');
+            document.getElementById('overlay-msg').innerHTML = `
+                <div class="mb-4 text-amber-400 text-4xl sm:text-6xl animate-bounce drop-shadow-[0_0_15px_rgba(245,158,11,0.8)]">⚔️💖</div>
+                <h1 class="text-2xl sm:text-4xl text-amber-400 mb-2 tracking-wider glow-title">DHAKA ROMANCE</h1>
+                <h2 class="text-xs sm:text-sm text-amber-300/80 mb-6 tracking-widest font-mono">OUR STORY - 16-BIT RPG EDITION</h2>
+                <p class="text-xs sm:text-sm text-slate-300 mb-8 max-w-md leading-relaxed font-sans">
+                    Experience high-detail 16-bit RPG graphics with rich shadows, character avatars, interior CNG bumpy rides, and atmospheric Dhaka locations!
+                </p>
+                <button id="btn-start" class="pixel-btn bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-xl text-xs sm:text-sm font-bold border-2 border-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.5)]">
+                    START QUEST ▶
+                </button>
+            `;
+            document.getElementById('btn-start').addEventListener('click', startGame);
+            setStage(1);
+        }
+
+        // Setup Event Handlers
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', resetGame);
+
+        document.getElementById('btn-audio').addEventListener('click', () => {
+            sound.muted = !sound.muted;
+            document.getElementById('btn-audio').innerText = sound.muted ? '🔇 Muted' : '🔊 Audio';
+        });
+
+        // Controls binding
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+        const btnAction = document.getElementById('btn-action');
+
+        const bindTouchEvents = (element, keyName) => {
+            element.addEventListener('mousedown', (e) => { e.preventDefault(); keys[keyName] = true; });
+            element.addEventListener('mouseup', (e) => { e.preventDefault(); keys[keyName] = false; });
+            element.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[keyName] = false; });
+            element.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
+            element.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
+        };
+
+        bindTouchEvents(btnLeft, 'left');
+        bindTouchEvents(btnRight, 'right');
+
+        const triggerAction = (e) => {
+            if (e) e.preventDefault();
+            if (dialogueActive) {
+                advanceDialogue();
+            }
+        };
+
+        btnAction.addEventListener('click', triggerAction);
+        btnAction.addEventListener('touchstart', triggerAction);
+
+        // Keyboard navigation
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === ' ' || e.key === 'Enter') {
+                advanceDialogue();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+        });
+
+        document.getElementById('dialogue-box').addEventListener('click', advanceDialogue);
+
+        // Run animation loop
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
